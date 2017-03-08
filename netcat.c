@@ -1419,6 +1419,7 @@ static int readwrite (fd)
   int istty;
   time_t start, current;
   // int foo;
+  int stdinClosed = 0;
 
   timer3.tv_sec = 0;
   timer3.tv_usec = 1000;
@@ -1461,7 +1462,10 @@ static int readwrite (fd)
       insaved = 0;    /* buffer left over from argv construction, */
     else {
       FD_CLR (0, ding1);  /* OR we've already got our repeat chunk, */
-      close (0);    /* so we won't need any more stdin */
+      if(!stdinClosed) {
+        close (0);    /* so we won't need any more stdin */
+        stdinClosed = 1;
+      }
     } /* Single */
   } /* insaved */
 
@@ -1576,7 +1580,10 @@ Debug (("got %d from the net, errno %d", rr, errno))
    mobygrams are kinda fun and exercise the reassembler. */
   if (rr <= 0) {      /* at end, or fukt, or ... */
     FD_CLR (0, ding1);    /* disable and close stdin */
-    close (0);
+    if(!stdinClosed) {
+      close (0);
+      stdinClosed = 1;
+    }
   } else {
     rzleft = rr;
     zp = (unsigned char*)bigbuf_in;
@@ -1585,7 +1592,10 @@ Debug (("got %d from the net, errno %d", rr, errno))
     if (! Single) {    /* we might be scanning... */
       insaved = rr;    /* save len */
       FD_CLR (0, ding1);    /* disable further junk from stdin */
-      close (0);      /* really, I mean it */
+      if(!stdinClosed) {
+        close (0);      /* really, I mean it */
+        stdinClosed = 1;
+      }
     } /* Single */
   } /* if rr/read */
     } /* stdin:ding */
@@ -1604,14 +1614,24 @@ Debug (("got %d from the net, errno %d", rr, errno))
    open TCP port or every UDP attempt, so save its size and clean up stdin */
       if (! Single) {    /* we might be scanning... */
         insaved = rr;    /* save len */
-        close (0);      /* really, I mean it */
+        if(!stdinClosed) {
+          close (0);      /* really, I mean it */
+          stdinClosed = 1;
+        }
       }
     }
   } else {
     /* (weld) this is gonna block until a <cr> so it kinda sucks */
-    rr = read (0, bigbuf_in, BIGSIZ);
+    if(stdinClosed) {
+      rr = -1;
+    } else {
+      rr = read (0, bigbuf_in, BIGSIZ);
+    }
     if (rr <= 0) {      /* at end, or fukt, or ... */
-      close (0);
+      if(!stdinClosed) {
+        close (0);
+        stdinClosed = 1;
+      }
     } else {
       rzleft = rr;
       zp = (unsigned char*)bigbuf_in;
@@ -1619,7 +1639,10 @@ Debug (("got %d from the net, errno %d", rr, errno))
    open TCP port or every UDP attempt, so save its size and clean up stdin */
       if (! Single) {    /* we might be scanning... */
         insaved = rr;    /* save len */
-        close (0);      /* really, I mean it */
+        if(!stdinClosed) {
+          close (0);      /* really, I mean it */
+          stdinClosed = 1;
+        }
       } /* Single */
     } /* if rr/read */
   }
@@ -2187,14 +2210,14 @@ Debug (("netfd %d from port %d to port %d", netfd, ourport, curport))
 
 #ifdef HAVE_HELP    /* unless we wanna be *really* cryptic */
 #ifndef VERSION
-# define VERSION "1.14.custom"
+# define VERSION "1.14.custom2"
 #endif
 /* helpme :
    the obvious */
 static int helpme()
 {
   o_verbose = 1;
-  holler ("NetCat for Windows v" VERSION " https://github.com/joedrago/netcat, forked from https://github.com/diegocr/netcat\n\
+  holler ("NetCat for Windows v" VERSION " (https://github.com/joedrago/netcat, forked from https://github.com/diegocr/netcat)\n\
 connect to somewhere:  nc [-options] hostname port[s] [ports] ... \n\
 listen for inbound:  nc -l -p port [options] [hostname] [port]\n\
 options:");
